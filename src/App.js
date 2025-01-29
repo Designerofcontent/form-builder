@@ -1,32 +1,25 @@
 import React from 'react';
-import { CssBaseline, Container } from '@mui/material';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { Container, Box, Typography, CssBaseline } from '@mui/material';
 import FormSteps from './components/FormSteps';
-import EmbedForm from './components/EmbedForm';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={
-          <>
-            <CssBaseline />
-            <Container maxWidth="lg" sx={{ py: 4 }}>
-              <FormSteps />
-            </Container>
-          </>
-        } />
-        <Route path="/embed/:formId" element={<EmbedForm />} />
-        <Route path="/f/:formId" element={
-          <>
-            <CssBaseline />
-            <Container maxWidth="lg" sx={{ py: 4 }}>
-              <FormSteps viewOnly />
-            </Container>
-          </>
-        } />
-      </Routes>
-    </Router>
+    <>
+      <CssBaseline />
+      <Router>
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Pokkadot Form Builder
+            </Typography>
+          </Box>
+          <Routes>
+            <Route path="/" element={<FormSteps />} />
+          </Routes>
+        </Container>
+      </Router>
+    </>
   );
 }
 

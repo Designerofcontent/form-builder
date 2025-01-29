@@ -1,10 +1,12 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
+import ReactDOM from 'react-dom';
+import './index.css';
+import './styles/FormBuilder.css';
+import FormBuilder from './components/FormBuilder';
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
+ReactDOM.render(
   <React.StrictMode>
-    <App />
-  </React.StrictMode>
+    <FormBuilder />
+  </React.StrictMode>,
+  document.getElementById('root')
 );

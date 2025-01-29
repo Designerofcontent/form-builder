@@ -1,28 +1,25 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box,
   Stepper,
   Step,
   StepLabel,
   Button,
-  Typography,
+  Box,
   Paper,
 } from '@mui/material';
 import FormBuilder from './FormBuilder';
 import PaymentConfig from './PaymentConfig';
 import FormPreview from './FormPreview';
 
-const steps = ['Build Form', 'Payment Settings', 'Preview & Submit'];
+const steps = ['Build Form', 'Configure Payment', 'Preview'];
 
-const FormSteps = ({ viewOnly = false }) => {
-  const navigate = useNavigate();
-  const { formId } = useParams();
+function FormSteps() {
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     questions: [],
+    selectedPrice: null,
     payment: {
-      required: false,
+      required: true, // Always required
       amount: 0,
       currency: 'USD',
       description: '',
@@ -30,28 +27,80 @@ const FormSteps = ({ viewOnly = false }) => {
   });
 
   const handleNext = () => {
-    if (activeStep === steps.length - 1) {
-      // Submit form
-      const newFormId = formId || Date.now().toString();
-      // Here you would typically save the form to your backend
-      console.log('Form submitted:', formData);
-      navigate(`/embed/${newFormId}`);
-    } else {
-      setActiveStep((prevStep) => prevStep + 1);
+    if (activeStep === 0 && Array.isArray(formData.questions)) {
+      // Look for radio questions with prices
+      for (const question of formData.questions) {
+        if (question.type === 'radio' && Array.isArray(question.options)) {
+          const selectedOption = question.options.find(opt => opt.selected);
+          if (selectedOption?.price) {
+            setFormData(prev => ({
+              ...prev,
+              selectedPrice: selectedOption.price,
+              payment: {
+                ...prev.payment,
+                amount: selectedOption.price,
+                description: `Selected plan: ${selectedOption.label}`
+              }
+            }));
+            break;
+          }
+        }
+      }
     }
+    setActiveStep((prevStep) => prevStep + 1);
   };
 
   const handleBack = () => {
     setActiveStep((prevStep) => prevStep - 1);
   };
 
-  const handleFormUpdate = (data) => {
-    setFormData((prev) => ({ ...prev, ...data }));
+  const handleFormUpdate = (questions) => {
+    setFormData(prev => ({
+      ...prev,
+      questions: Array.isArray(questions) ? questions : [],
+    }));
   };
 
-  if (viewOnly) {
-    return <FormPreview questions={formData.questions} viewOnly />;
-  }
+  const handlePaymentUpdate = (payment) => {
+    setFormData(prev => ({
+      ...prev,
+      payment: {
+        ...payment,
+        required: true, // Always required
+        // Keep the amount locked to the selected price if one exists
+        amount: prev.selectedPrice || payment.amount
+      },
+    }));
+  };
+
+  const getStepContent = (step) => {
+    switch (step) {
+      case 0:
+        return (
+          <FormBuilder
+            questions={formData.questions}
+            onUpdate={handleFormUpdate}
+          />
+        );
+      case 1:
+        return (
+          <PaymentConfig
+            payment={formData.payment}
+            onUpdate={handlePaymentUpdate}
+            selectedPrice={formData.selectedPrice}
+          />
+        );
+      case 2:
+        return (
+          <FormPreview
+            questions={formData.questions}
+            payment={formData.payment}
+          />
+        );
+      default:
+        return 'Unknown step';
+    }
+  };
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -62,51 +111,27 @@ const FormSteps = ({ viewOnly = false }) => {
           </Step>
         ))}
       </Stepper>
-
-      <Paper sx={{ p: 3, mb: 3 }}>
-        {activeStep === 0 && (
-          <FormBuilder
-            formData={formData}
-            onUpdate={handleFormUpdate}
-          />
-        )}
-        {activeStep === 1 && (
-          <PaymentConfig
-            paymentData={formData.payment}
-            onUpdate={(payment) => handleFormUpdate({ payment })}
-          />
-        )}
-        {activeStep === 2 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Preview Your Form
-            </Typography>
-            <Paper sx={{ p: 3, bgcolor: '#f5f5f5' }}>
-              <FormPreview
-                questions={formData.questions}
-                payment={formData.payment}
-              />
-            </Paper>
-          </Box>
-        )}
+      <Paper sx={{ p: 3 }}>
+        {getStepContent(activeStep)}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+          <Button
+            disabled={activeStep === 0}
+            onClick={handleBack}
+            sx={{ mr: 1 }}
+          >
+            Back
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleNext}
+            disabled={activeStep === steps.length - 1}
+          >
+            {activeStep === steps.length - 1 ? 'Finish' : 'Next'}
+          </Button>
+        </Box>
       </Paper>
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        <Button
-          disabled={activeStep === 0}
-          onClick={handleBack}
-        >
-          Back
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleNext}
-        >
-          {activeStep === steps.length - 1 ? 'Finish' : 'Next'}
-        </Button>
-      </Box>
     </Box>
   );
-};
+}
 
 export default FormSteps;

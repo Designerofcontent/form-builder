@@ -1,496 +1,479 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  IconButton,
-  Grid,
-  Drawer,
-  Tabs,
-  Tab,
-  Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Tooltip,
-  MenuItem,
-  InputAdornment,
-  Radio,
-  RadioGroup,
-  FormControlLabel,
-} from '@mui/material';
-import {
-  Title as HeadingIcon,
-  TextFields as TextIcon,
-  ShortText as SingleLineIcon,
-  Notes as MultiLineIcon,
-  Numbers as NumberIcon,
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  Link as LinkIcon,
-  LocationOn as AddressIcon,
-  DateRange as DateIcon,
-  Schedule as TimeIcon,
-  Event as SchedulerIcon,
-  Poll as ScaleIcon,
-  Star as StarIcon,
-  FormatListNumbered as RankingIcon,
-  RadioButtonChecked as SingleChoiceIcon,
-  CheckBox as MultipleChoiceIcon,
-  Image as ImageIcon,
-  Payment as PaymentIcon,
-  Security as RecaptchaIcon,
-  Upload as FileUploadIcon,
-  DragIndicator,
-  Delete,
-  Palette as DesignIcon,
-  Settings as AdvancedIcon,
-  Preview as PreviewIcon,
-  History as HistoryIcon,
-  Add,
-  ArrowDropDown,
-  RemoveCircle,
-} from '@mui/icons-material';
+import { Plus, X, Search, Type, Mail, Phone, Calendar, Image, FileText, Star, BarChart, CheckSquare, List, Settings, Eye, DollarSign, Trash, Code } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import DesignSettings from './DesignSettings';
+import EmbedCode from './EmbedCode';
 
-const ELEMENT_CATEGORIES = {
-  basic: {
-    label: 'Basic Elements',
-    items: [
-      { id: 'heading', label: 'Heading', icon: HeadingIcon },
-      { id: 'text', label: 'Text Block', icon: TextIcon },
-      { id: 'singleline', label: 'Single Line', icon: SingleLineIcon },
-      { id: 'multiline', label: 'Multi Line', icon: MultiLineIcon },
-      { id: 'number', label: 'Number', icon: NumberIcon },
-      { id: 'email', label: 'Email', icon: EmailIcon },
-      { id: 'phone', label: 'Phone', icon: PhoneIcon },
-      { id: 'link', label: 'Link', icon: LinkIcon },
-      { id: 'address', label: 'Address', icon: AddressIcon },
-    ],
-  },
-  datetime: {
-    label: 'Date & Time',
-    items: [
-      { id: 'date', label: 'Date', icon: DateIcon },
-      { id: 'time', label: 'Time', icon: TimeIcon },
-      { id: 'scheduler', label: 'Scheduler', icon: SchedulerIcon },
-    ],
-  },
-  choice: {
-    label: 'Choice',
-    items: [
-      { id: 'scale', label: 'Scale', icon: ScaleIcon },
-      { id: 'rating', label: 'Rating', icon: StarIcon },
-      { id: 'ranking', label: 'Ranking', icon: RankingIcon },
-      { id: 'singlechoice', label: 'Single Choice', icon: SingleChoiceIcon },
-      { id: 'multiplechoice', label: 'Multiple Choice', icon: MultipleChoiceIcon },
-      { id: 'dropdown', label: 'Dropdown', icon: ArrowDropDown },
-    ],
-  },
-  upload: {
-    label: 'Upload',
-    items: [
-      { id: 'image', label: 'Image', icon: ImageIcon },
-      { id: 'file', label: 'File Upload', icon: FileUploadIcon },
-    ],
-  },
-  payment: {
-    label: 'Payment',
-    items: [
-      { id: 'payment', label: 'Payment', icon: PaymentIcon },
-    ],
-  },
-  security: {
-    label: 'Security',
-    items: [
-      { id: 'recaptcha', label: 'reCAPTCHA', icon: RecaptchaIcon },
-    ],
-  },
-};
+// Initialize Stripe with the publishable key from environment
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || 'pk_live_GfpA1cJKg6Q7Bp0aMPAmzci200BLRNKgG4');
 
-const FormBuilder = ({ formData, onUpdate }) => {
-  const [questions, setQuestions] = useState(formData?.questions || []);
-  const [rightPanelTab, setRightPanelTab] = useState('design');
-  const [elementSearchQuery, setElementSearchQuery] = useState('');
-  const [showElementPicker, setShowElementPicker] = useState(false);
+const PaymentForm = ({ amount, onSuccess }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    onUpdate?.({ questions });
-  }, [questions, onUpdate]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setProcessing(true);
 
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-    const items = Array.from(questions);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-    setQuestions(items);
-  };
+    if (!stripe || !elements) {
+      return;
+    }
 
-  const addElement = (elementType) => {
-    const newElement = {
-      id: Date.now().toString(),
-      type: elementType,
-      label: `New ${elementType}`,
-      required: false,
-      options: elementType === 'dropdown' ? [
-        { label: 'Basic Plan', price: 2.99, selected: true },
-        { label: 'Pro Plan', price: 7.99, selected: false },
-        { label: 'Premium Plan', price: 14.99, selected: false }
-      ] : undefined,
-    };
-    setQuestions([...questions, newElement]);
-    setShowElementPicker(false);
-  };
-
-  const handleOptionChange = (questionId, index, field, value) => {
-    const updatedQuestions = questions.map(q => {
-      if (q.id === questionId) {
-        const newOptions = q.options.map((opt, i) => ({
-          ...opt,
-          selected: field === 'selected' ? i === index : opt.selected
-        }));
-        if (field !== 'selected') {
-          newOptions[index] = {
-            ...newOptions[index],
-            [field]: value
-          };
-        }
-        return { ...q, options: newOptions };
-      }
-      return q;
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: elements.getElement(CardElement),
     });
-    setQuestions(updatedQuestions);
-  };
 
-  const addOption = (questionId) => {
-    const updatedQuestions = questions.map(q => {
-      if (q.id === questionId) {
-        return {
-          ...q,
-          options: [
-            ...q.options,
-            { label: `Plan ${q.options.length + 1}`, price: 0, selected: false }
-          ]
-        };
-      }
-      return q;
-    });
-    setQuestions(updatedQuestions);
+    if (error) {
+      setError(error.message);
+      setProcessing(false);
+    } else {
+      // Here you would typically send the paymentMethod.id to your server
+      // to complete the payment
+      console.log('Payment successful:', paymentMethod);
+      onSuccess(paymentMethod);
+      setProcessing(false);
+    }
   };
-
-  const removeOption = (questionId, index) => {
-    const updatedQuestions = questions.map(q => {
-      if (q.id === questionId && q.options.length > 1) {
-        const newOptions = q.options.filter((_, i) => i !== index);
-        return { ...q, options: newOptions };
-      }
-      return q;
-    });
-    setQuestions(updatedQuestions);
-  };
-
-  const filteredCategories = elementSearchQuery
-    ? Object.entries(ELEMENT_CATEGORIES).map(([category, data]) => ({
-        ...data,
-        items: data.items.filter(item =>
-          item.label.toLowerCase().includes(elementSearchQuery.toLowerCase())
-        ),
-      }))
-    : ELEMENT_CATEGORIES;
 
   return (
-    <DragDropContext onDragEnd={handleDragEnd}>
-      <Box sx={{ display: 'flex', height: '100vh' }}>
-        {/* Main Form Area */}
-        <Box sx={{ flex: 1, p: 3, overflow: 'auto' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-            <Button
-              variant="contained"
-              onClick={() => setShowElementPicker(true)}
-              startIcon={<Add />}
-            >
-              Add Elements
-            </Button>
-            <Box>
-              <Tooltip title="Preview">
-                <IconButton><PreviewIcon /></IconButton>
-              </Tooltip>
-              <Tooltip title="History">
-                <IconButton><HistoryIcon /></IconButton>
-              </Tooltip>
-            </Box>
-          </Box>
-
-          <Droppable droppableId="questions">
-            {(provided) => (
-              <Box
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                sx={{ minHeight: '100px' }}
-              >
-                {questions.map((question, index) => (
-                  <Draggable 
-                    key={question.id} 
-                    draggableId={question.id} 
-                    index={index}
-                  >
-                    {(provided) => (
-                      <Paper
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        sx={{ mb: 2, p: 2 }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <IconButton {...provided.dragHandleProps}>
-                            <DragIndicator />
-                          </IconButton>
-                          <TextField
-                            value={question.label}
-                            onChange={(e) => {
-                              const updatedQuestions = questions.map(q =>
-                                q.id === question.id ? { ...q, label: e.target.value } : q
-                              );
-                              setQuestions(updatedQuestions);
-                            }}
-                            fullWidth
-                            variant="standard"
-                          />
-                          <IconButton onClick={() => {
-                            setQuestions(questions.filter(q => q.id !== question.id));
-                          }}>
-                            <Delete />
-                          </IconButton>
-                        </Box>
-                        
-                        {question.type === 'dropdown' && (
-                          <Box sx={{ mt: 2, pl: 6 }}>
-                            <RadioGroup
-                              value={question.options.findIndex(opt => opt.selected)}
-                              onChange={(e) => handleOptionChange(question.id, parseInt(e.target.value), 'selected', true)}
-                            >
-                              {question.options.map((option, optionIndex) => (
-                                <Box key={optionIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
-                                  <FormControlLabel
-                                    value={optionIndex}
-                                    control={<Radio />}
-                                    label=""
-                                  />
-                                  <TextField
-                                    value={option.label}
-                                    onChange={(e) => handleOptionChange(question.id, optionIndex, 'label', e.target.value)}
-                                    size="small"
-                                    sx={{ flex: 1 }}
-                                    placeholder="Plan name"
-                                  />
-                                  <TextField
-                                    value={option.price}
-                                    onChange={(e) => handleOptionChange(question.id, optionIndex, 'price', parseFloat(e.target.value) || 0)}
-                                    size="small"
-                                    type="number"
-                                    sx={{ width: 120 }}
-                                    InputProps={{
-                                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
-                                    }}
-                                    placeholder="Price"
-                                  />
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => removeOption(question.id, optionIndex)}
-                                    disabled={question.options.length <= 1}
-                                  >
-                                    <Delete fontSize="small" />
-                                  </IconButton>
-                                </Box>
-                              ))}
-                            </RadioGroup>
-                            <Button
-                              startIcon={<Add />}
-                              onClick={() => addOption(question.id)}
-                              size="small"
-                              sx={{ mt: 1 }}
-                            >
-                              Add Plan
-                            </Button>
-                          </Box>
-                        )}
-                      </Paper>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </Box>
-            )}
-          </Droppable>
-        </Box>
-
-        {/* Right Panel */}
-        <Drawer
-          variant="permanent"
-          anchor="right"
-          sx={{
-            width: 300,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': {
-              width: 300,
-              boxSizing: 'border-box',
-              position: 'relative',
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="p-4 border rounded-lg">
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+              invalid: {
+                color: '#9e2146',
+              },
             },
           }}
-        >
-          <Tabs
-            value={rightPanelTab}
-            onChange={(_, newValue) => setRightPanelTab(newValue)}
-            centered
+        />
+      </div>
+      {error && <div className="text-red-500 text-sm">{error}</div>}
+      <button
+        type="submit"
+        disabled={!stripe || processing}
+        className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+      >
+        {processing ? 'Processing...' : `Pay $${amount}`}
+      </button>
+    </form>
+  );
+};
+
+const FormBuilder = ({ onUpdate }) => {
+  const [elements, setElements] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showEmbedModal, setShowEmbedModal] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('design'); // 'design' or 'advanced'
+  const [selectedOptions, setSelectedOptions] = useState({});
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [theme, setTheme] = useState({
+    name: 'custom',
+    primaryColor: '#FF00BF',
+    questionColor: '#101828',
+    answerColor: '#101828',
+    formColor: '#ffffff',
+    backgroundColor: '#ffffff',
+    fontFamily: 'Inter',
+    fontSize: 'md',
+    fontWeight: 'normal',
+    margin: 'md',
+    layout: 'standard'
+  });
+
+  useEffect(() => {
+    // Calculate total amount based on selected options
+    let total = 0;
+    Object.entries(selectedOptions).forEach(([elementId, optionId]) => {
+      const element = elements.find(el => el.id.toString() === elementId);
+      if (element && element.options) {
+        const selectedOption = element.options.find(opt => opt.id.toString() === optionId);
+        if (selectedOption) {
+          total += parseFloat(selectedOption.price) || 0;
+        }
+      }
+    });
+    setTotalAmount(total);
+  }, [selectedOptions, elements]);
+
+  const elementCategories = [
+    {
+      title: 'Basic',
+      items: [
+        { id: 'heading', icon: Type, label: 'Heading' },
+        { id: 'richtext', icon: FileText, label: 'Rich Text Block' },
+        { id: 'singleline', icon: FileText, label: 'Single Line Input' },
+        { id: 'multiline', icon: FileText, label: 'Multi-line Input' },
+        { id: 'number', icon: List, label: 'Number' },
+      ]
+    },
+    {
+      title: 'Personal',
+      items: [
+        { id: 'name', icon: Type, label: 'Name' },
+        { id: 'email', icon: Mail, label: 'Email' },
+        { id: 'phone', icon: Phone, label: 'Phone' },
+        { id: 'link', icon: FileText, label: 'Link' },
+        { id: 'address', icon: FileText, label: 'Address' },
+      ]
+    },
+    {
+      title: 'Date & Time',
+      items: [
+        { id: 'date', icon: Calendar, label: 'Date' },
+        { id: 'time', icon: Calendar, label: 'Time' },
+        { id: 'scheduler', icon: Calendar, label: 'Scheduler' },
+      ]
+    },
+    {
+      title: 'Survey',
+      items: [
+        { id: 'scale', icon: BarChart, label: 'Scale Rating' },
+        { id: 'star', icon: Star, label: 'Star Rating' },
+        { id: 'ranking', icon: List, label: 'Ranking' },
+      ]
+    },
+    {
+      title: 'Choice',
+      items: [
+        { id: 'singlechoice', icon: CheckSquare, label: 'Single Choice' },
+        { id: 'multiplechoice', icon: CheckSquare, label: 'Multiple Choice' },
+        { id: 'picturechoice', icon: Image, label: 'Picture Choice' },
+        { id: 'dropdown', icon: List, label: 'Drop Down' },
+      ]
+    },
+  ];
+
+  const handleAddElement = (type) => {
+    const newElement = {
+      id: Date.now(),
+      type,
+      label: `New ${type}`,
+      required: false,
+      options: type === 'dropdown' ? [{ label: '', price: '0', id: Date.now() }] : undefined
+    };
+    setElements([...elements, newElement]);
+  };
+
+  const handleOptionSelect = (elementId, optionId) => {
+    setSelectedOptions(prev => ({
+      ...prev,
+      [elementId]: optionId
+    }));
+  };
+
+  const renderElement = (element) => {
+    switch (element.type) {
+      case 'dropdown':
+        return (
+          <div className="space-y-2">
+            {element.options.map((option) => (
+              <div key={option.id} className="flex items-center space-x-4">
+                <input
+                  type="radio"
+                  name={`element-${element.id}`}
+                  checked={selectedOptions[element.id] === option.id.toString()}
+                  onChange={() => handleOptionSelect(element.id.toString(), option.id.toString())}
+                  className="w-4 h-4 text-pink-600"
+                />
+                <span className="flex-1">{option.label}</span>
+                <span className="text-gray-600">${parseFloat(option.price).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      // Add other element types here
+      default:
+        return null;
+    }
+  };
+
+  const handlePaymentSuccess = (paymentMethod) => {
+    console.log('Payment successful:', paymentMethod);
+    setShowPaymentModal(false);
+    // Handle post-payment logic here
+  };
+
+  const onDragEnd = (result) => {
+    if (!result.destination) return;
+    const items = Array.from(elements);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    setElements(items);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50" style={{ fontFamily: theme.fontFamily }}>
+      <div className="border-b bg-white px-4 py-3 flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <span className="font-medium">Untitled Form</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowEmbedModal(true)}
+            className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 flex items-center gap-2"
           >
-            <Tab 
-              icon={<DesignIcon />} 
-              label="Design" 
-              value="design"
-            />
-            <Tab 
-              icon={<AdvancedIcon />} 
-              label="Advanced" 
-              value="advanced"
-            />
-          </Tabs>
-          <Box sx={{ p: 2 }}>
-            {rightPanelTab === 'design' && (
-              <>
-                <Typography variant="subtitle1" gutterBottom>Theme</Typography>
-                <TextField
-                  select
-                  fullWidth
-                  value="custom"
-                  variant="outlined"
-                  size="small"
-                  sx={{ mb: 2 }}
-                >
-                  <MenuItem value="custom">Custom Theme</MenuItem>
-                </TextField>
+            <Code className="w-4 h-4" />
+            Embed
+          </button>
+          <button className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+            Publish
+          </button>
+        </div>
+      </div>
 
-                <Typography variant="subtitle1" gutterBottom>Colors</Typography>
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                  <Grid item xs={6}>
-                    <Typography variant="caption">Primary Color</Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value="#FF00BFF"
-                      InputProps={{
-                        startAdornment: (
-                          <Box
-                            sx={{
-                              width: 20,
-                              height: 20,
-                              bgcolor: '#FF00BFF',
-                              mr: 1,
-                              borderRadius: 1,
-                            }}
-                          />
-                        ),
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="caption">Background Color</Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value="#FFFFFF"
-                      InputProps={{
-                        startAdornment: (
-                          <Box
-                            sx={{
-                              width: 20,
-                              height: 20,
-                              bgcolor: '#FFFFFF',
-                              mr: 1,
-                              borderRadius: 1,
-                              border: '1px solid #E0E0E0',
-                            }}
-                          />
-                        ),
-                      }}
-                    />
-                  </Grid>
-                </Grid>
+      <div className="flex">
+        {/* Left Panel - Elements */}
+        <div className="w-64 bg-[#FF00BF] p-4 min-h-screen">
+          <h2 className="text-white font-semibold mb-4">Form Elements</h2>
+          <div className="space-y-2">
+            {elementCategories.map(category => (
+              <div key={category.title} className="bg-white/10 rounded-lg p-3">
+                <h3 className="text-white text-sm mb-2">{category.title}</h3>
+                <div className="space-y-1">
+                  {category.items.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleAddElement(item.id)}
+                      className="w-full flex items-center space-x-2 p-2 bg-white/5 hover:bg-white/20 rounded-lg text-white text-sm"
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-                <Typography variant="subtitle1" gutterBottom>Font</Typography>
-                <TextField
-                  select
-                  fullWidth
-                  value="inter"
-                  variant="outlined"
-                  size="small"
-                  sx={{ mb: 2 }}
-                >
-                  <MenuItem value="inter">Inter</MenuItem>
-                </TextField>
-              </>
+        {/* Center Panel - Form Builder */}
+        <div className="flex-1 p-6" style={{ backgroundColor: theme.backgroundColor }}>
+          <div className="max-w-3xl mx-auto">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="form-elements">
+                {(provided) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="space-y-4"
+                  >
+                    {elements.map((element, index) => (
+                      <Draggable
+                        key={element.id}
+                        draggableId={element.id.toString()}
+                        index={index}
+                      >
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+                            style={{ backgroundColor: theme.formColor }}
+                          >
+                            <div className="flex justify-between items-center mb-4">
+                              <input
+                                type="text"
+                                value={element.label}
+                                onChange={(e) => {
+                                  const newElements = [...elements];
+                                  newElements[index].label = e.target.value;
+                                  setElements(newElements);
+                                }}
+                                className="text-lg font-medium bg-transparent border-none focus:outline-none"
+                                style={{ color: theme.questionColor }}
+                              />
+                              <button
+                                onClick={() => {
+                                  const newElements = [...elements];
+                                  newElements.splice(index, 1);
+                                  setElements(newElements);
+                                }}
+                                className="text-gray-400 hover:text-red-500"
+                              >
+                                <Trash className="w-4 h-4" />
+                              </button>
+                            </div>
+                            
+                            {element.type === 'dropdown' && (
+                              <div className="space-y-2">
+                                {element.options.map((option, optionIndex) => (
+                                  <div key={option.id} className="flex items-center space-x-2">
+                                    <input
+                                      type="text"
+                                      value={option.label}
+                                      onChange={(e) => {
+                                        const newElements = [...elements];
+                                        newElements[index].options[optionIndex].label = e.target.value;
+                                        setElements(newElements);
+                                      }}
+                                      placeholder="Option label"
+                                      className="flex-1 p-2 border rounded"
+                                      style={{ color: theme.answerColor }}
+                                    />
+                                    <div className="flex items-center">
+                                      <span className="text-gray-500">$</span>
+                                      <input
+                                        type="number"
+                                        value={option.price}
+                                        onChange={(e) => {
+                                          const newElements = [...elements];
+                                          newElements[index].options[optionIndex].price = e.target.value;
+                                          setElements(newElements);
+                                        }}
+                                        placeholder="0.00"
+                                        className="w-24 p-2 border rounded"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        const newElements = [...elements];
+                                        newElements[index].options.splice(optionIndex, 1);
+                                        if (newElements[index].options.length === 0) {
+                                          newElements[index].options.push({ label: '', price: '0', id: Date.now() });
+                                        }
+                                        setElements(newElements);
+                                      }}
+                                      className="text-gray-400 hover:text-red-500"
+                                    >
+                                      <Trash className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  onClick={() => {
+                                    const newElements = [...elements];
+                                    newElements[index].options.push({ label: '', price: '0', id: Date.now() });
+                                    setElements(newElements);
+                                  }}
+                                  className="flex items-center text-blue-600 hover:text-blue-700"
+                                >
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Add Option
+                                </button>
+                              </div>
+                            )}
+                            {renderElement(element)}
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
+
+            {elements.length > 0 && (
+              <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4">Payment Details</h2>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-lg">
+                    <span>Total Amount:</span>
+                    <span className="font-semibold">${totalAmount.toFixed(2)}</span>
+                  </div>
+                  <button
+                    onClick={() => setShowPaymentModal(true)}
+                    className="w-full bg-[#FF00BF] text-white py-3 px-4 rounded-lg hover:bg-opacity-90"
+                    style={{ backgroundColor: theme.primaryColor }}
+                  >
+                    Proceed to Payment
+                  </button>
+                </div>
+              </div>
             )}
-          </Box>
-        </Drawer>
+          </div>
+        </div>
 
-        {/* Element Picker Dialog */}
-        <Dialog 
-          open={showElementPicker} 
-          onClose={() => setShowElementPicker(false)}
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="h6">Add Elements</Typography>
-              <TextField
-                placeholder="Search elements..."
-                size="small"
-                value={elementSearchQuery}
-                onChange={(e) => setElementSearchQuery(e.target.value)}
-                sx={{ ml: 'auto', width: 200 }}
+        {/* Right Panel - Design Settings */}
+        <div className="w-80 bg-white border-l border-gray-200 overflow-y-auto">
+          <div className="flex border-b">
+            <button
+              className={`flex-1 px-4 py-2 text-sm ${
+                selectedTab === 'design'
+                  ? 'text-[#FF00BF] border-b-2 border-[#FF00BF]'
+                  : 'text-gray-500'
+              }`}
+              onClick={() => setSelectedTab('design')}
+            >
+              Design
+            </button>
+            <button
+              className={`flex-1 px-4 py-2 text-sm ${
+                selectedTab === 'advanced'
+                  ? 'text-[#FF00BF] border-b-2 border-[#FF00BF]'
+                  : 'text-gray-500'
+              }`}
+              onClick={() => setSelectedTab('advanced')}
+            >
+              Advanced
+            </button>
+          </div>
+
+          {selectedTab === 'design' ? (
+            <DesignSettings theme={theme} onThemeChange={setTheme} />
+          ) : (
+            <div className="p-4">
+              {/* Add advanced settings here */}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-[500px]">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Complete Payment</h2>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <Elements stripe={stripePromise}>
+              <PaymentForm
+                amount={totalAmount.toFixed(2)}
+                onSuccess={handlePaymentSuccess}
               />
-            </Box>
-          </DialogTitle>
-          <DialogContent>
-            <Grid container spacing={3}>
-              {Object.entries(filteredCategories).map(([category, { label, items }]) => (
-                items.length > 0 && (
-                  <Grid item xs={12} key={category}>
-                    <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-                      {label}
-                    </Typography>
-                    <Grid container spacing={1}>
-                      {items.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <Grid item xs={4} key={item.id}>
-                            <Button
-                              fullWidth
-                              variant="outlined"
-                              startIcon={<Icon />}
-                              onClick={() => addElement(item.id)}
-                              sx={{ 
-                                justifyContent: 'flex-start',
-                                textTransform: 'none',
-                                py: 1.5,
-                              }}
-                            >
-                              {item.label}
-                            </Button>
-                          </Grid>
-                        );
-                      })}
-                    </Grid>
-                    <Divider sx={{ my: 2 }} />
-                  </Grid>
-                )
-              ))}
-            </Grid>
-          </DialogContent>
-        </Dialog>
-      </Box>
-    </DragDropContext>
+            </Elements>
+          </div>
+        </div>
+      )}
+
+      {/* Embed Modal */}
+      {showEmbedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-[600px]">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Embed Form</h2>
+              <button
+                onClick={() => setShowEmbedModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <EmbedCode formId="your-form-id" theme={theme} />
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
