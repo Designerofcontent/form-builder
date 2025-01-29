@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/form-builder/static/js/main.f45e9200.js",
+    "index.html": "/form-builder/index.html",
+    "main.f45e9200.js.map": "/form-builder/static/js/main.f45e9200.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.f45e9200.js"
+  ]
+}
