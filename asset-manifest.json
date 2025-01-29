@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/form-builder/static/js/main.0d154178.js",
+    "main.js": "/form-builder/static/js/main.87a5b4fa.js",
     "index.html": "/form-builder/index.html",
-    "main.0d154178.js.map": "/form-builder/static/js/main.0d154178.js.map"
+    "main.87a5b4fa.js.map": "/form-builder/static/js/main.87a5b4fa.js.map"
   },
   "entrypoints": [
-    "static/js/main.0d154178.js"
+    "static/js/main.87a5b4fa.js"
   ]
 }
