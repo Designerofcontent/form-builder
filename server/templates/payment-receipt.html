@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .receipt-details {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .amount {
+            font-size: 24px;
+            color: #2196f3;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+        .items {
+            margin: 20px 0;
+        }
+        .item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Payment Receipt</h1>
+        <p>Thank you for your payment</p>
+    </div>
+
+    <div class="receipt-details">
+        <h2>{{formTitle}}</h2>
+        <div class="amount">{{amount}}</div>
+        
+        <p><strong>Payment ID:</strong> {{paymentId}}</p>
+        <p><strong>Date:</strong> {{date}}</p>
+
+        {{#if items.length}}
+        <div class="items">
+            <h3>Items</h3>
+            {{#each items}}
+            <div class="item">
+                <p><strong>{{name}}</strong></p>
+                <p>{{description}}</p>
+            </div>
+            {{/each}}
+        </div>
+        {{/if}}
+    </div>
+
+    <div class="footer">
+        <p>This is an automated receipt. Please keep it for your records.</p>
+        <p>If you have any questions, please contact support.</p>
+    </div>
+</body>
+</html>
