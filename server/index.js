@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const emailService = require('./services/emailService');
 const PaymentAnalytics = require('./models/PaymentAnalytics');
+const path = require('path');
 
 dotenv.config();
 
@@ -13,6 +14,7 @@ const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../build')));
 
 // MongoDB connection with better logging
 mongoose.connect(process.env.MONGODB_URI, {
@@ -190,6 +192,15 @@ app.delete('/api/forms/:id', async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// API Routes
+const paymentRoutes = require('./routes/payment');
+app.use('/api/payment', paymentRoutes);
+
+// Serve React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../build', 'index.html'));
 });
 
 app.listen(port, () => {

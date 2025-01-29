@@ -5,23 +5,113 @@ import {
   Typography,
   TextField,
   Button,
-  MenuItem,
   FormControl,
   FormControlLabel,
-  Checkbox,
   Alert,
   CircularProgress,
   Radio,
   RadioGroup,
 } from '@mui/material';
 import { Payment as PaymentIcon } from '@mui/icons-material';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// Initialize Stripe with environment variable
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+
+const PaymentForm = ({ amount, currency, onPaymentComplete }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setProcessing(true);
+    setError(null);
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    try {
+      // Create payment intent
+      const response = await fetch('/api/payment/create-payment-intent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: amount * 100, // Convert to cents
+          currency: currency.toLowerCase(),
+        }),
+      });
+
+      const { clientSecret } = await response.json();
+
+      // Confirm payment
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement),
+        },
+      });
+
+      if (result.error) {
+        setError(result.error.message);
+      } else {
+        onPaymentComplete();
+      }
+    } catch (err) {
+      setError('An error occurred while processing your payment.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <Box sx={{ mb: 2 }}>
+        <CardElement
+          options={{
+            style: {
+              base: {
+                fontSize: '16px',
+                color: '#424770',
+                '::placeholder': {
+                  color: '#aab7c4',
+                },
+              },
+              invalid: {
+                color: '#9e2146',
+              },
+            },
+          }}
+        />
+      </Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      <Button
+        type="submit"
+        variant="contained"
+        disabled={!stripe || processing}
+        startIcon={processing ? <CircularProgress size={20} /> : <PaymentIcon />}
+        fullWidth
+      >
+        {processing ? 'Processing...' : `Pay ${currency} ${amount.toFixed(2)}`}
+      </Button>
+    </form>
+  );
+};
 
 const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
   const [formData, setFormData] = useState({});
   const [selectedPrice, setSelectedPrice] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentComplete, setPaymentComplete] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     // Set initial selected prices from default selections
@@ -36,7 +126,6 @@ const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
   }, [questions]);
 
   useEffect(() => {
-    // Update payment amount when price changes
     if (payment?.required && onUpdate) {
       onUpdate({
         ...payment,
@@ -51,7 +140,6 @@ const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
       [questionId]: value
     }));
 
-    // If this is a dropdown with a price, update the selected price
     if (price !== null) {
       setSelectedPrice(price);
     }
@@ -59,36 +147,31 @@ const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
-    setSuccess(false);
 
+    if (payment?.required && !paymentComplete) {
+      setShowPaymentForm(true);
+      return;
+    }
+
+    // Handle form submission after payment or if payment not required
     try {
-      // Here you would integrate with your selected payment gateway
-      if (payment?.required) {
-        // Simulate payment processing
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // In a real implementation, you would:
-        // 1. Create a payment intent with your payment gateway
-        // 2. Handle the payment confirmation
-        // 3. Process the form submission
-      }
-
-      // Simulate form submission
+      // Submit form data to your backend
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setSuccess(true);
       if (!viewOnly) {
-        // Reset form after successful submission
         setFormData({});
         setSelectedPrice(0);
+        setShowPaymentForm(false);
+        setPaymentComplete(false);
       }
     } catch (err) {
-      setError(err.message || 'An error occurred while processing your submission.');
-    } finally {
-      setIsSubmitting(false);
+      setError('An error occurred while submitting the form.');
     }
+  };
+
+  const handlePaymentComplete = () => {
+    setPaymentComplete(true);
+    setShowPaymentForm(false);
   };
 
   return (
@@ -99,10 +182,9 @@ const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
         </Alert>
       )}
 
-      {success && (
+      {paymentComplete && (
         <Alert severity="success" sx={{ mb: 3 }}>
-          Form submitted successfully!
-          {payment?.required && ' Payment processed.'}
+          Payment successful! Form submitted.
         </Alert>
       )}
 
@@ -149,8 +231,6 @@ const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
               disabled={viewOnly}
             />
           )}
-
-          {/* Add more question types here */}
         </Paper>
       ))}
 
@@ -174,18 +254,29 @@ const FormPreview = ({ questions, payment, onUpdate, viewOnly = false }) => {
               {payment.description}
             </Typography>
           )}
+
+          {showPaymentForm && !paymentComplete && (
+            <Box sx={{ mt: 2 }}>
+              <Elements stripe={stripePromise}>
+                <PaymentForm
+                  amount={selectedPrice}
+                  currency={payment.currency}
+                  onPaymentComplete={handlePaymentComplete}
+                />
+              </Elements>
+            </Box>
+          )}
         </Paper>
       )}
 
-      {!viewOnly && (
+      {!viewOnly && !showPaymentForm && (
         <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             type="submit"
             variant="contained"
-            disabled={isSubmitting}
-            startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
+            startIcon={<PaymentIcon />}
           >
-            {isSubmitting ? 'Processing...' : payment?.required ? 'Submit & Pay' : 'Submit'}
+            {payment?.required ? 'Proceed to Payment' : 'Submit'}
           </Button>
         </Box>
       )}
